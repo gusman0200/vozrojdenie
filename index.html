@@ -13,7 +13,6 @@
     --primary: #3b82f6;
     --primary-hover: #2563eb;
     --border: #374151;
-    --danger: #ef4444;
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -182,10 +181,9 @@
   </div>
 <script>
   // === НАСТРОЙКА ===
-  // ВСТАВЬ СЮДА НОВЫЙ URL ИЗ НОВОГО РАЗВЁРТЫВАНИЯ (после шага «Развернуть»)
+  // ВСТАВИТЬ СЮДА НОВЫЙ URL ИЗ НОВОГО РАЗВЁРТЫВАНИЯ (в GAS: Развернуть → Управление развертываниями → URL для запуска)
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx0cfm39Wq8oFlL2g20sFZFx-ABikhEuK411i8V0Uloy8MQAIDdRzTcLkGs8hG93R9K/exec";
 
-  // Глобальные данные
   let EMPLOYEES = [];
   let SUPPLIERS = [];
   let BUYERS = [];
@@ -196,7 +194,7 @@
     fatty_cost: 0
   };
 
-  // --- Навигация ---
+  // --- Навигация между экранами ---
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
     if (id === 'main-menu') {
@@ -207,7 +205,7 @@
     }
   }
 
-  // --- Загрузка справочников и итогов (doGet) ---
+  // --- Загрузка справочников и итогов (вызов doGet) ---
   async function loadTotals(forceRefresh = false) {
     const btn = document.querySelector('#stats button[onclick="loadTotals(true)"]');
     if (btn) {
@@ -216,7 +214,6 @@
     }
 
     try {
-      // ИСПРАВЛЕНИЕ: чистый URL без _cb, cache: 'no-cache' вместо параметров
       const res = await fetch(GAS_URL, { 
         method: 'GET', 
         cache: 'no-cache' 
@@ -225,29 +222,27 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      // Если GAS вернул ошибку (например, нет SHEET_ID), покажем её
-      if (data.status === 'error') {
-        throw new Error(data.message || 'Ошибка в скрипте Google Apps Script');
+      // Ожидаем формат от GAS: { status: 'ok', data: {...} }
+      if (data.status !== 'ok') {
+        throw new Error(data.message || 'Ошибка сервера');
       }
 
-      // Справочники
-      EMPLOYEES = (data.employees || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
-      SUPPLIERS = (data.suppliers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
-      BUYERS = (data.buyers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+      const payload = data.data;
 
-      // Итоги
-      const t = data.totals || {};
+      EMPLOYEES = (payload.employees || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+      SUPPLIERS = (payload.suppliers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+      BUYERS = (payload.buyers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+
+      const t = payload.totals || {};
       TOTALS.soapstock_weight = parseFloat(t.soapstock_weight) || 0;
       TOTALS.soapstock_cost = parseFloat(t.soapstock_cost) || 0;
       TOTALS.fatty_weight = parseFloat(t.fatty_weight) || 0;
       TOTALS.fatty_cost = parseFloat(t.fatty_cost) || 0;
 
-      // Обновляем списки в интерфейсе
       updateSelect('soap-supplier', SUPPLIERS, 'Нет поставщиков');
       updateSelect('fatty-buyer', BUYERS, 'Нет покупателей');
       updateSelect('staff-employee', EMPLOYEES, 'Нет сотрудников');
 
-      // Обновляем статистику
       document.getElementById('stat-soap-weight').textContent = TOTALS.soapstock_weight.toFixed(2) + ' т';
       document.getElementById('stat-soap-cost').textContent = Math.round(TOTALS.soapstock_cost).toLocaleString('ru-RU') + ' ₽';
       document.getElementById('stat-fatty-weight').textContent = TOTALS.fatty_weight.toFixed(2) + ' т';
@@ -283,7 +278,7 @@
     }
   }
 
-  // --- Табы справочников ---
+  // --- Переключение табов в справочниках ---
   let currentDirTab = 'employee';
   function setDirTab(tab) {
     currentDirTab = tab;
@@ -293,7 +288,7 @@
     });
   }
 
-  // --- Добавление в справочник (add_directory) ---
+  // --- Добавление в справочник (POST add_directory) ---
   async function addDirectory() {
     const inp = document.getElementById('dir-value');
     const val = (inp.value || '').trim();
@@ -317,10 +312,150 @@
         body: JSON.stringify(payload)
       });
       const resp = await res.json();
-      if (resp.status === 'error') throw new Error(resp.message || 'Ошибка сервера');
+      if (resp.status !== 'ok') throw new Error(resp.message || 'Ошибка сервера');
 
       inp.value = '';
       loadTotals(); // обновим справочники
       alert('✅ Добавлен в справочник: ' + val);
     } catch (e) {
-      alert('Ошибка
+      alert('Ошибка: ' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '➕ Добавить в справочник';
+      }
+    }
+  }
+
+  // --- Сохранение приёма соапстока ---
+  async function saveSoapstock() {
+    const date = document.getElementById('soap-date').value;
+    const supplier = document.getElementById('soap-supplier').value;
+    const weight = parseFloat(document.getElementById('soap-weight').value);
+    const price = parseFloat(document.getElementById('soap-price').value);
+
+    if (!date || !supplier || isNaN(weight) || isNaN(price)) {
+      alert('Заполните все поля: дата, поставщик, вес и цена.');
+      return;
+    }
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+
+    try {
+      const payload = {
+        type: 'save_soapstock',
+        date,
+        supplier,
+        weight,
+        price
+      };
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const resp = await res.json();
+      if (resp.status !== 'ok') throw new Error(resp.message || 'Ошибка сохранения');
+
+      alert('✅ Приём соапстока сохранён');
+      loadTotals();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✅ Сохранить приём (Соапсток)';
+      }
+    }
+  }
+
+  // --- Сохранение отгрузки ЖК ---
+  async function saveFatty() {
+    const date = document.getElementById('fatty-date').value;
+    const buyer = document.getElementById('fatty-buyer').value;
+    const weight = parseFloat(document.getElementById('fatty-weight').value);
+    const price = parseFloat(document.getElementById('fatty-price').value);
+
+    if (!date || !buyer || isNaN(weight) || isNaN(price)) {
+      alert('Заполните все поля: дата, покупатель, вес и цена.');
+      return;
+    }
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+
+    try {
+      const payload = {
+        type: 'save_fatty',
+        date,
+        buyer,
+        weight,
+        price
+      };
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const resp = await res.json();
+      if (resp.status !== 'ok') throw new Error(resp.message || 'Ошибка сохранения');
+
+      alert('✅ Отгрузка ЖК сохранена');
+      loadTotals();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✅ Сохранить отгрузку (ЖК)';
+      }
+    }
+  }
+
+  // --- Учёт рабочего времени ---
+  async function saveStaff() {
+    const date = document.getElementById('staff-date').value;
+    const employee = document.getElementById('staff-employee').value;
+    const norm = parseFloat(document.getElementById('staff-norm').value);
+    const overtime = parseFloat(document.getElementById('staff-overtime').value);
+
+    if (!date || !employee || isNaN(norm) || isNaN(overtime)) {
+      alert('Заполните все поля: дата, сотрудник, норма и сверхурочно.');
+      return;
+    }
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+
+    try {
+      const payload = {
+        type: 'save_staff',
+        date,
+        employee,
+        norm,
+        overtime
+      };
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const resp = await res.json();
+      if (resp.status !== 'ok') throw new Error(resp.message || 'Ошибка сохранения');
+
+      alert('✅ Время зафиксировано');
+      loadTotals();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✅ Зафиксировать время';
+      }
+    }
+  }
+</script>
