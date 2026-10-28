@@ -5,80 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Учёт сырья</title>
   <meta name="theme-color" content="#121212" />
-</head>
-<style>
-  :root {
-    --bg: #121212;
-    --surface: #1e1e1e;
-    --text: #e0e0e0;
-    --accent: #bb86fc;
-    --border: #333;
-  }
-  @media (prefers-color-scheme: light) {
+  <style>
     :root {
-      --bg: #f5f5f5;
-      --surface: #ffffff;
-      --text: #000000;
-      --accent: #6200ee;
-      --border: #ccc;
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --text: #e0e0e0;
+      --accent: #bb86fc;
+      --border: #333;
     }
-  }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f5;
+        --surface: #ffffff;
+        --text: #000000;
+        --accent: #6200ee;
+        --border: #ccc;
+      }
+    }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    margin: 0;
-    padding: 12px;
-  }
-  .container {
-    max-width: 500px;
-    margin: auto;
-  }
-  h1 { margin-top: 0; }
-  .card {
-    background: var(--surface);
-    padding: 16px;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    border: 1px solid var(--border);
-  }
-  input, select, button {
-    width: 100%;
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: #2c2c2c;
-    color: white;
-    box-sizing: border-box;
-  }
-  button {
-    background: var(--accent);
-    color: #000;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:disabled { background: #555; color: #aaa; }
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .stat-item {
-    text-align: center;
-  }
-  .stat-value { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
-  .stat-label { font-size: 0.85rem; color: #888; }
-  .status { padding: 8px; border-radius: 6px; text-align: center; margin-bottom: 12px; }
-  .success { background: #0f9d58; color: white; }
-  .error { background: #db4437; color: white; }
-</style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 12px;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+    }
+    h1 { margin-top: 0; }
+    .card {
+      background: var(--surface);
+      padding: 16px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #2c2c2c;
+      color: white;
+      box-sizing: border-box;
+    }
+    button {
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { background: #555; color: #aaa; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-value { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+    .stat-label { font-size: 0.85rem; color: #888; }
+    .status {
+      padding: 8px;
+      border-radius: 6px;
+      text-align: center;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .success { background: #0f9d58; color: white; }
+    .error { background: #db4437; color: white; }
+  </style>
+</head>
 <body>
   <div class="container">
     <h1>Учёт сырья</h1>
 
-    <div id="status" class="status" style="display:none;"></div>
+    <div id="status" class="status"></div>
 
     <!-- Статистика -->
     <div class="card">
@@ -138,13 +144,11 @@
 
         const d = data.data;
 
-        // Заполняем статистику
         document.getElementById('soapstock-weight').textContent = (d.totals.soapstock_weight || 0).toFixed(2) + ' т';
         document.getElementById('fatty-weight').textContent = (d.totals.fatty_weight || 0).toFixed(2) + ' т';
         document.getElementById('soapstock-cost').textContent = (d.totals.soapstock_cost || 0).toLocaleString('ru-RU') + ' ₽';
         document.getElementById('fatty-cost').textContent = (d.totals.fatty_cost || 0).toLocaleString('ru-RU') + ' ₽';
 
-        // Заполняем поставщиков
         const suppliersEl = document.getElementById('supplier-select');
         suppliersEl.innerHTML = '';
         (d.suppliers || []).forEach(s => {
@@ -213,7 +217,7 @@
 
         if (resp.status === 'success') {
           showStatus('✅ Успешно!', true);
-          loadData(); // обновить статистику и списки
+          loadData();
         } else {
           throw new Error(resp.message || 'Ошибка от сервера');
         }
