@@ -215,12 +215,54 @@
     }
 
     try {
-      const nocacheUrl = `${GAS_URL}?_cb=${Date.now()}`;
-      const res = await fetch(nocacheUrl, { method: 'GET' });
+      // ИСПРАВЛЕНИЕ: Убираем _cb и используем cache: 'no-cache'
+      const res = await fetch(GAS_URL, { 
+        method: 'GET', 
+        cache: 'no-cache' 
+      });
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      
+      // Проверка на внутреннюю ошибку GAS (например, нет SHEET_ID)
+      if (data.status === 'error') throw new Error(data.message || 'Ошибка в скрипте Google Apps Script');
 
+      // Справочники
+      EMPLOYEES = (data.employees || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+      SUPPLIERS = (data.suppliers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+      BUYERS = (data.buyers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
+
+      // Итоги
+      const t = data.totals || {};
+      TOTALS.soapstock_weight = parseFloat(t.soapstock_weight) || 0;
+      TOTALS.soapstock_cost = parseFloat(t.soapstock_cost) || 0;
+      TOTALS.fatty_weight = parseFloat(t.fatty_weight) || 0;
+      TOTALS.fatty_cost = parseFloat(t.fatty_cost) || 0;
+
+      // Обновляем списки в интерфейсе
+      updateSelect('soap-supplier', SUPPLIERS, 'Нет поставщиков');
+      updateSelect('fatty-buyer', BUYERS, 'Нет покупателей');
+      updateSelect('staff-employee', EMPLOYEES, 'Нет сотрудников');
+
+      // Обновляем статистику
+      document.getElementById('stat-soap-weight').textContent = TOTALS.soapstock_weight.toFixed(2) + ' т';
+      document.getElementById('stat-soap-cost').textContent = Math.round(TOTALS.soapstock_cost).toLocaleString('ru-RU') + ' ₽';
+      document.getElementById('stat-fatty-weight').textContent = TOTALS.fatty_weight.toFixed(2) + ' т';
+      document.getElementById('stat-fatty-cost').textContent = Math.round(TOTALS.fatty_cost).toLocaleString('ru-RU') + ' ₽';
+
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Пересчитать статистику и справочники';
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка загрузки данных: ' + e.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Пересчитать статистику и справочники';
+      }
+    }
+  }
       // Справочники
       EMPLOYEES = (data.employees || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
       SUPPLIERS = (data.suppliers || []).map(v => String(v).trim()).filter(v => v && v !== 'undefined' && v !== 'null');
